@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Python Dojo 🐍 — Learn Python from Scratch</title>
+  <meta name="description" content="An interactive, beginner-friendly Python tutorial. Learn Python step by step with code examples and quizzes." />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Particle canvas background -->
+  <canvas id="particles"></canvas>
+
+  <!-- Sidebar Navigation -->
+  <nav id="sidebar">
+    <div class="sidebar-header">
+      <span class="logo">🐍</span>
+      <h1>Python Dojo</h1>
+      <p class="tagline">Zero → Hero</p>
+    </div>
+    <div class="progress-bar-container">
+      <div class="progress-bar" id="globalProgress">
+        <div class="progress-fill" style="width: 0%"></div>
+      </div>
+      <span class="progress-text" id="progressText">0% Complete</span>
+    </div>
+    <ul id="lessonNav"></ul>
+    <div style="margin: 1rem 1.5rem; text-align: center;">
+      <a href="battle.html" class="btn-primary" style="display: block; text-decoration: none; padding: 0.8rem; border-radius: 8px;">
+        ⚔️ Battle Arena
+      </a>
+    </div>
+    <div class="sidebar-footer">
+      <div class="xp-badge" id="xpBadge">⚡ 0 XP</div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main id="mainContent">
+    <!-- Landing / Welcome Screen -->
+    <section id="welcomeScreen" class="screen active">
+      <div class="welcome-container">
+        <div class="welcome-icon">🐍</div>
+        <h1 class="welcome-title">Welcome to <span class="gradient-text">Python Dojo</span></h1>
+        <p class="welcome-subtitle">Your journey from complete beginner to Python warrior starts here. No experience needed — just vibes and curiosity.</p>
+        <div class="feature-cards">
+          <div class="feature-card">
+            <span class="feature-icon">📚</span>
+            <h3>10 Lessons</h3>
+            <p>Bite-sized lessons that build on each other</p>
+          </div>
+          <div class="feature-card">
+            <span class="feature-icon">💻</span>
+            <h3>Code Examples</h3>
+            <p>Real code you can study and understand</p>
+          </div>
+          <div class="feature-card">
+            <span class="feature-icon">🧠</span>
+            <h3>Quizzes</h3>
+            <p>Test your knowledge after each lesson</p>
+          </div>
+          <div class="feature-card">
+            <span class="feature-icon">⚡</span>
+            <h3>XP System</h3>
+            <p>Earn points and track your progress</p>
+          </div>
+        </div>
+        <button class="btn-primary btn-glow" onclick="startLearning()">
+          Start Learning
+          <span class="btn-arrow">→</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Lesson Screen -->
+    <section id="lessonScreen" class="screen">
+      <div class="lesson-container">
+        <div class="lesson-header">
+          <span class="lesson-badge" id="lessonBadge">Lesson 1</span>
+          <h2 class="lesson-title" id="lessonTitle"></h2>
+          <p class="lesson-desc" id="lessonDesc"></p>
+        </div>
+
+        <div class="lesson-body" id="lessonBody"></div>
+
+        <div class="lesson-nav-buttons">
+          <button class="btn-secondary" id="prevBtn" onclick="prevLesson()">← Previous</button>
+          <button class="btn-primary" id="nextBtn" onclick="nextLesson()">
+            Next Lesson →
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Quiz Screen -->
+    <section id="quizScreen" class="screen">
+      <div class="quiz-container">
+        <div class="quiz-header">
+          <span class="quiz-icon">🧠</span>
+          <h2 class="quiz-title" id="quizTitle">Quiz Time!</h2>
+          <p class="quiz-subtitle" id="quizSubtitle"></p>
+        </div>
+        <div id="quizBody"></div>
+        <div class="quiz-actions">
+          <button class="btn-primary btn-glow" id="submitQuiz" onclick="submitQuiz()">Submit Answers</button>
+        </div>
+        <div id="quizResults" class="quiz-results hidden"></div>
+        <div class="quiz-nav hidden" id="quizNav">
+          <button class="btn-primary" onclick="continueAfterQuiz()">Continue →</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Completion Screen -->
+    <section id="completionScreen" class="screen">
+      <div class="completion-container">
+        <div class="completion-icon">🏆</div>
+        <h1 class="welcome-title">You Did It, <span class="gradient-text">Champion!</span></h1>
+        <p class="welcome-subtitle">You've completed all 10 lessons of the Python Dojo. You now know the fundamentals of Python programming!</p>
+        <div class="completion-stats" id="completionStats"></div>
+        <div class="completion-next">
+          <h3>What's Next?</h3>
+          <ul>
+            <li>🔨 Build small projects (calculator, to-do list, guessing game)</li>
+            <li>📖 Explore libraries like <code>requests</code>, <code>flask</code>, <code>pygame</code></li>
+            <li>🌐 Try coding challenges on <strong>LeetCode</strong> or <strong>HackerRank</strong></li>
+            <li>🤖 Get into automation, web scraping, or AI/ML</li>
+          </ul>
+        </div>
+        <button class="btn-secondary" onclick="restartCourse()">🔄 Restart Course</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="lessons.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
