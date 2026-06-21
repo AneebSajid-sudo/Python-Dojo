@@ -1,269 +1,214 @@
-<!DOCTYPE html>
-<html class="dark" lang="en"><head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>Python Dojo - Battle Arena</title>
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&amp;family=Hanken+Grotesk:wght@400;600&amp;family=JetBrains+Mono:wght@400;700&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@100..900&amp;family=JetBrains+Mono:wght@100..900&amp;family=Sora:wght@100..900&amp;display=swap" rel="stylesheet"/>
+// =============================================
+// Python Dojo — Battle Arena Logic
+// =============================================
 
-<!-- Pyodide and Ace Editor for real Python execution -->
-<script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.6/ace.js"></script>
+// --- State ---
+let pyodideReady = false;
+let pyodideInstance = null;
+let editor = null;
+let bossDefeated = false;
 
-<style>
-        .material-symbols-outlined {
-            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+// --- DOM Elements ---
+const runBtn = document.getElementById("runCodeBtn");
+const consoleOutput = document.getElementById("consoleOutput");
+const pyodideStatus = document.getElementById("pyodideStatus");
+const clearBtn = document.getElementById("clearConsoleBtn");
+const bossHpBar = document.getElementById("bossHpBar");
+const bossHpText = document.getElementById("bossHpText");
+const sidebarXP = document.getElementById("sidebarXP");
+
+// --- Initialization ---
+async function init() {
+    // 1. Initialize Ace Editor
+    editor = ace.edit("editor");
+    editor.setTheme("ace/theme/tomorrow_night_eighties");
+    editor.session.setMode("ace/mode/python");
+    editor.setOptions({
+        fontSize: "14px",
+        fontFamily: "'JetBrains Mono', monospace",
+        showPrintMargin: false,
+        wrap: true
+    });
+    
+    // Load local storage XP
+    try {
+        const data = JSON.parse(localStorage.getItem("pythonDojo"));
+        if (data && data.xp) {
+            sidebarXP.textContent = `⚡ ${data.xp} XP`;
         }
-        .glass-panel {
-            background: rgba(24, 27, 37, 0.7);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        .glow-primary {
-            box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
-        }
-        .glow-error {
-            box-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
-        }
-        .glow-secondary {
-            box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
-        }
-        /* Custom scrollbar for hacker vibes */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #0a0e17; }
-        ::-webkit-scrollbar-thumb { background: #31353f; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: #6366f1; }
+    } catch(e) {}
+
+    // 2. Initialize Pyodide
+    try {
+        pyodideInstance = await loadPyodide();
         
-        #editor {
-            position: absolute;
-            top: 0;
-            right: 0;
-            bottom: 0;
-            left: 0;
-            background-color: transparent;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 14px;
+        // Setup stdout redirection to capture print() statements
+        pyodideInstance.setStdout({
+            batched: (msg) => {
+                logToConsole(msg, "text-on-surface");
+            }
+        });
+        
+        pyodideReady = true;
+        pyodideStatus.textContent = "[OK]";
+        pyodideStatus.className = "text-secondary font-bold";
+        
+        // Enable Run button
+        runBtn.disabled = false;
+        runBtn.className = "group flex items-center gap-4 bg-primary text-on-primary font-headline-md py-4 px-8 rounded-xl glow-primary hover:scale-[1.02] active:scale-95 transition-all cursor-pointer";
+        runBtn.innerHTML = `
+            <span class="font-bold">Run Code & Attack</span>
+            <span class="material-symbols-outlined group-hover:rotate-12 transition-transform" style="font-variation-settings: 'FILL' 1;">swords</span>
+        `;
+        
+        logToConsole(">> System Ready. Awaiting commands.", "text-secondary/70");
+
+    } catch (err) {
+        pyodideStatus.textContent = "[FAILED]";
+        pyodideStatus.className = "text-error font-bold";
+        logToConsole(">> Error loading Python environment: " + err.message, "text-error");
+    }
+
+    // Mobile menu toggle
+    const battleToggle = document.getElementById('battleMenuToggle');
+    const battleSidebar = document.getElementById('battleSidebar');
+    const battleBackdrop = document.getElementById('battleBackdrop');
+    if (battleToggle && battleSidebar && battleBackdrop) {
+        battleToggle.addEventListener('click', () => {
+            battleSidebar.classList.toggle('-translate-x-full');
+            battleBackdrop.classList.toggle('hidden');
+        });
+        battleBackdrop.addEventListener('click', () => {
+            battleSidebar.classList.add('-translate-x-full');
+            battleBackdrop.classList.add('hidden');
+        });
+    }
+}
+
+// --- Console Helper ---
+function logToConsole(message, cssClass = "text-on-surface") {
+    const p = document.createElement("p");
+    p.className = cssClass;
+    p.textContent = message;
+    consoleOutput.appendChild(p);
+    consoleOutput.scrollTop = consoleOutput.scrollHeight;
+}
+
+clearBtn.addEventListener("click", () => {
+    consoleOutput.innerHTML = "";
+});
+
+// --- Battle Logic ---
+runBtn.addEventListener("click", async () => {
+    if (!pyodideReady || bossDefeated) return;
+    
+    const userCode = editor.getValue();
+    
+    logToConsole(">> Running tests...", "text-secondary mt-2");
+    
+    const testCode = `
+import sys
+import io
+
+original_stdout = sys.stdout
+sys.stdout = io.StringIO()
+
+try:
+${userCode.split('\n').map(line => '    ' + line).join('\n')}
+except Exception as e:
+    print(f"ERROR: {e}")
+
+user_output = sys.stdout.getvalue()
+sys.stdout = original_stdout
+
+def _run_tests():
+    try:
+        result = reverse_string("python")
+        if result != "nohtyp":
+            return {"success": False, "msg": f"Test 1 Failed: reverse_string('python') returned '{result}', expected 'nohtyp'"}
+        result2 = reverse_string("hello")
+        if result2 != "olleh":
+            return {"success": False, "msg": f"Test 2 Failed: reverse_string('hello') returned '{result2}', expected 'olleh'"}
+        return {"success": True, "output": user_output}
+    except NameError:
+        return {"success": False, "msg": "Function reverse_string not found!"}
+    except Exception as e:
+        return {"success": False, "msg": f"Test Error: {e}"}
+
+_run_tests()
+`;
+
+    try {
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('TIMEOUT')), 5000)
+        );
+        const result = await Promise.race([
+            pyodideInstance.runPythonAsync(testCode),
+            timeoutPromise
+        ]);
+        const resObj = result.toJs();
+        
+        if (resObj.get("success")) {
+            const printOutput = resObj.get("output");
+            if (printOutput) {
+                 logToConsole("Output: " + printOutput.trim(), "text-on-surface-variant");
+            }
+            logToConsole(">> Test Case 1: 'python' -> 'nohtyp' [PASSED]", "text-secondary font-bold");
+            logToConsole(">> Test Case 2: 'hello' -> 'olleh' [PASSED]", "text-secondary font-bold");
+            triggerVictory();
+        } else {
+            logToConsole(">> " + resObj.get("msg"), "text-error font-bold");
+            bossFlash("error");
         }
         
-        .ace_gutter {
-            background: transparent !important;
-            color: rgba(223, 226, 239, 0.3) !important;
-            border-right: 1px solid rgba(255, 255, 255, 0.05);
+    } catch (err) {
+        if (err.message === 'TIMEOUT') {
+            logToConsole(">> Execution timed out (5s). Check for infinite loops.", "text-error font-bold");
+        } else {
+            logToConsole(">> Syntax Error in your code:\n" + err.message, "text-error");
         }
-    </style>
-<script id="tailwind-config">
-        tailwind.config = {
-            darkMode: "class",
-            theme: {
-                extend: {
-                    "colors": {
-                        "on-surface": "#dfe2ef",
-                        "surface-container-high": "#262a34",
-                        "background": "#0f131c",
-                        "secondary-fixed-dim": "#4edea3",
-                        "on-surface-variant": "#c7c4d7",
-                        "tertiary-fixed": "#ffdad7",
-                        "on-secondary": "#003824",
-                        "primary-container": "#8083ff",
-                        "on-tertiary-fixed": "#410004",
-                        "surface": "#0f131c",
-                        "on-error": "#690005",
-                        "primary-fixed": "#e1e0ff",
-                        "inverse-on-surface": "#2c303a",
-                        "surface-container-low": "#181b25",
-                        "on-tertiary-fixed-variant": "#930013",
-                        "primary": "#c0c1ff",
-                        "outline-variant": "#464554",
-                        "tertiary": "#ffb3ad",
-                        "on-secondary-fixed-variant": "#005236",
-                        "surface-container-highest": "#31353f",
-                        "error-container": "#93000a",
-                        "inverse-primary": "#494bd6",
-                        "secondary": "#4edea3",
-                        "surface-tint": "#c0c1ff",
-                        "on-primary": "#1000a9",
-                        "on-primary-fixed": "#07006c",
-                        "inverse-surface": "#dfe2ef",
-                        "tertiary-container": "#ff5451",
-                        "tertiary-fixed-dim": "#ffb3ad",
-                        "on-background": "#dfe2ef",
-                        "surface-variant": "#31353f",
-                        "surface-container": "#1c1f29",
-                        "on-primary-fixed-variant": "#2f2ebe",
-                        "on-secondary-container": "#00311f",
-                        "secondary-fixed": "#6ffbbe",
-                        "on-primary-container": "#0d0096",
-                        "on-tertiary-container": "#5c0008",
-                        "secondary-container": "#00a572",
-                        "error": "#ffb4ab",
-                        "on-error-container": "#ffdad6",
-                        "surface-container-lowest": "#0a0e17",
-                        "surface-bright": "#353943",
-                        "on-secondary-fixed": "#002113",
-                        "on-tertiary": "#68000a",
-                        "outline": "#908fa0",
-                        "primary-fixed-dim": "#c0c1ff",
-                        "surface-dim": "#0f131c"
-                    },
-                    "fontFamily": {
-                        "headline-md": ["Sora"],
-                        "display": ["Sora"],
-                        "body-lg": ["Hanken Grotesk"],
-                        "headline-lg": ["Sora"],
-                        "body-md": ["Hanken Grotesk"],
-                        "code-md": ["JetBrains Mono"],
-                        "headline-lg-mobile": ["Sora"],
-                        "label-caps": ["JetBrains Mono"]
-                    }
-                },
-            },
-        }
-    </script>
-</head>
-<body class="bg-surface-container-lowest text-on-surface font-body-md overflow-hidden h-screen">
-<!-- Global Layout Shell -->
-<div class="flex h-full w-full">
-<!-- SideNavBar -->
-<aside class="flex flex-col py-8 px-4 bg-surface-container-low/70 backdrop-blur-xl border-r border-white/10 shadow-2xl h-full w-64 left-0">
-<div class="mb-10 px-2 flex flex-col gap-2">
-<span class="font-headline-md text-xl font-bold text-primary">🐍 Python Dojo</span>
-<div class="flex items-center gap-2 mt-4 bg-surface-container-high/50 p-3 rounded-xl border border-white/5">
-<div class="w-10 h-10 rounded-full overflow-hidden bg-primary/20 flex items-center justify-center">
-<img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAKzlDQgKsCjfRq4P0g8VD-apscgzftNk0j7up6cbjygJltvhbyqgWUvt7aLQNC4CwGwn8hCvqvfEnYQd5IwMTq17k2JRfxoR1_9FTEF2OPM2AkCN9dpx7LaZ2ZzBGyVYEDYlvLjgUiNsT-AAwjTwlmwkzl6k0O5JJMQgJ08Gr_j5nOVVEXR0WhqYVlFye6LNgnO0dF3RnUiDVs6sGm4vQVasw7YsyBmS3nmXg8-ipybJ2pLll8Q9vYdr2RTS7PdOmLyNk8CKFCGuVW"/>
-</div>
-<div class="flex flex-col">
-<span class="font-label-caps text-[10px] text-on-surface-variant">RANK: ADEPT</span>
-<span class="text-sm text-secondary font-bold" id="sidebarXP">⚡ 0 XP</span>
-</div>
-</div>
-</div>
-<nav class="flex-grow space-y-2">
-<a href="index.html" class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-white/5 hover:text-secondary transition-all duration-200 group active:scale-95">
-<span class="material-symbols-outlined">menu_book</span>
-<span class="font-body-md">Lessons</span>
-</a>
-<a href="index.html" class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-white/5 hover:text-secondary transition-all duration-200 group active:scale-95">
-<span class="material-symbols-outlined">code</span>
-<span class="font-body-md">Playground</span>
-</a>
-<a href="battle.html" class="flex items-center gap-3 px-4 py-3 rounded-lg text-secondary font-bold bg-white/5 shadow-inner active:scale-95">
-<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">swords</span>
-<span class="font-body-md">Battle Arena</span>
-</a>
-<a href="#" class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-white/5 hover:text-secondary transition-all duration-200 group active:scale-95">
-<span class="material-symbols-outlined">folder_special</span>
-<span class="font-body-md">Projects</span>
-</a>
-</nav>
-</aside>
+        bossFlash("error");
+    }
+});
 
-<!-- Main Workspace Area -->
-<main class="flex-grow flex flex-col h-screen relative overflow-hidden">
-<!-- TopAppBar -->
-<header class="flex justify-between items-center px-6 h-16 bg-surface-container-highest/70 backdrop-blur-md border-b border-white/10 z-40">
-<div class="flex items-center gap-8">
-<div class="flex items-center gap-6">
-<a class="text-on-surface-variant hover:text-primary transition-colors font-label-caps text-xs" href="#">Docs</a>
-<a class="text-on-surface-variant hover:text-primary transition-colors font-label-caps text-xs" href="#">Leaderboard</a>
-</div>
-</div>
-<div class="flex items-center gap-6">
-<div class="flex items-center gap-4">
-<button class="font-label-caps text-[10px] text-error hover:underline transition-all" onclick="localStorage.clear(); location.reload();">Reset Progress</button>
-</div>
-</div>
-</header>
+function bossFlash(type) {
+    const bossContainer = document.querySelector(".glow-error");
+    if(bossContainer) {
+        const oldClass = bossContainer.className;
+        bossContainer.className = bossContainer.className.replace("glow-error", type === "error" ? "glow-secondary" : "glow-primary");
+        setTimeout(() => {
+            bossContainer.className = oldClass;
+        }, 300);
+    }
+}
 
-<!-- Content Canvas -->
-<div class="flex-grow flex flex-col p-6 gap-6 overflow-y-auto relative bg-[#0a0e17]">
-<!-- Boss Challenge Section -->
-<section class="z-10">
-<div class="glass-panel rounded-xl p-8 flex flex-col md:flex-row items-center gap-8 relative overflow-hidden group">
-<div class="absolute -top-24 -right-24 w-64 h-64 bg-error/10 blur-[100px] rounded-full"></div>
-<div class="w-32 h-32 flex-shrink-0 bg-surface-container-highest rounded-2xl border-2 border-error/50 flex items-center justify-center glow-error overflow-hidden group-hover:scale-105 transition-transform duration-500">
-<img class="w-full h-full object-cover opacity-80" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBb4AP9jB4vONxovb-C3rzLhl5sVhuwB2NjVSqfdl7oWtLgatRzkjKvadiwVu7_c9Uz5R-o7I2bzxoqSIkfcLb5FGMIy5RhH28DFqkXJ8nEyahkUEvhghGO38O11JdHkq5YwvEJ55MQN9cvFWQISUyNE7Y7kpySr8dZ1WB2HDP4XpW_Qou8jmm86c13khrQTmyudweBgSRHDmSl9CW4GFgdum9yx6XtmEuWumLn11gcim1z5LSh8gJMDQVqrvzuf44QOTMk1aptvfPt"/>
-</div>
-<div class="flex-grow space-y-4 w-full">
-<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-<div>
-<h2 class="font-headline-lg text-2xl font-bold text-on-surface">Defeat the String Manipulator!</h2>
-<p class="text-on-surface-variant mt-1">Challenge: <span class="text-primary font-code-md">Write a function to reverse a string.</span></p>
-</div>
-<div class="px-4 py-2 bg-error/10 border border-error/30 rounded-lg hidden sm:block">
-<span class="font-label-caps text-error text-xs">CRITICAL BOSS</span>
-</div>
-</div>
-<!-- Health Bar -->
-<div class="space-y-2">
-<div class="flex justify-between text-xs font-label-caps">
-<span class="text-error font-bold">BOSS HP</span>
-<span class="text-error" id="bossHpText">100% / 100%</span>
-</div>
-<div class="h-6 w-full bg-surface-container-highest rounded-full overflow-hidden border border-white/5 p-1">
-<div id="bossHpBar" class="h-full bg-gradient-to-r from-error via-red-500 to-error-container rounded-full glow-error transition-all duration-1000" style="width: 100%">
-</div>
-</div>
-</div>
-</div>
-</div>
-</section>
+function triggerVictory() {
+    bossDefeated = true;
+    
+    // Update HP Bar
+    bossHpBar.style.width = "0%";
+    bossHpText.textContent = "0% / 100%";
+    bossHpText.className = "text-secondary font-bold";
+    document.querySelector(".text-error.font-bold").className = "text-secondary font-bold";
+    
+    // Add XP
+    try {
+        const data = JSON.parse(localStorage.getItem("pythonDojo")) || { xp: 0, completed: [] };
+        data.xp += 500;
+        localStorage.setItem("pythonDojo", JSON.stringify(data));
+        sidebarXP.textContent = `⚡ ${data.xp} XP`;
+    } catch(e) {}
+    
+    // Console message
+    logToConsole(">> BOSS DEFEATED! +500 XP Earned!", "text-primary text-lg font-bold mt-2");
+    
+    // Button change
+    runBtn.innerHTML = `
+        <span class="font-bold">Victory!</span>
+        <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">emoji_events</span>
+    `;
+    runBtn.className = "group flex items-center gap-4 bg-secondary text-on-secondary font-headline-md py-4 px-8 rounded-xl glow-secondary transition-all";
+}
 
-<!-- Vertical Workspace Stack -->
-<div class="flex-grow flex flex-col gap-6 z-10 min-h-[500px]">
-<!-- Editor Box -->
-<div class="flex-grow glass-panel rounded-xl flex flex-col overflow-hidden border-primary/10 relative" style="min-height: 250px;">
-<div class="bg-surface-container-highest px-4 py-2 flex items-center justify-between border-b border-white/5 z-10">
-<div class="flex items-center gap-3">
-<div class="flex gap-1.5">
-<div class="w-3 h-3 rounded-full bg-error/50"></div>
-<div class="w-3 h-3 rounded-full bg-amber-500/50"></div>
-<div class="w-3 h-3 rounded-full bg-secondary/50"></div>
-</div>
-<span class="font-code-md text-xs text-on-surface-variant ml-2">solution.py</span>
-</div>
-</div>
-<!-- Code content area for Ace -->
-<div class="flex-grow relative bg-[#05070a]">
-    <div id="editor">def reverse_string(s):
-    # TODO: Cast your spell here to reverse the string
-    return s
-
-# Test the manipulator's logic
-input_val = "python"
-print(reverse_string(input_val))
-</div>
-</div>
-</div>
-
-<!-- Terminal Box -->
-<div class="h-48 glass-panel rounded-xl flex flex-col overflow-hidden border-secondary/10 shrink-0">
-<div class="bg-surface-container-high px-4 py-1.5 flex items-center justify-between border-b border-white/5">
-<div class="flex items-center gap-2">
-<span class="material-symbols-outlined text-sm text-secondary">terminal</span>
-<span class="font-label-caps text-[10px] text-on-surface-variant">CONSOLE OUTPUT</span>
-</div>
-<button id="clearConsoleBtn" class="text-[10px] font-label-caps text-on-surface-variant hover:text-on-surface">CLEAR</button>
-</div>
-<div id="consoleOutput" class="flex-grow bg-[#05070a] p-4 font-code-md text-xs overflow-y-auto space-y-1">
-<p class="text-secondary/70">&gt;&gt; Initializing Python environment... <span id="pyodideStatus" class="text-amber-500 animate-pulse">[LOADING]</span></p>
-</div>
-</div>
-</div>
-
-<!-- Footer Action -->
-<div class="sticky bottom-0 z-20 flex justify-end pb-2 pt-4">
-<button id="runCodeBtn" disabled class="group flex items-center gap-4 bg-primary text-on-primary font-headline-md py-4 px-8 rounded-xl opacity-50 transition-all cursor-not-allowed">
-<span class="font-bold">Loading Python...</span>
-<span class="material-symbols-outlined group-hover:rotate-12 transition-transform" style="font-variation-settings: 'FILL' 1;">swords</span>
-</button>
-</div>
-</div>
-</main>
-</div>
-
-<!-- Game Logic -->
-<script src="battle.js"></script>
-
-</body></html>
+// Boot
+init();
