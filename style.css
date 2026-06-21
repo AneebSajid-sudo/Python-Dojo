@@ -1101,6 +1101,47 @@ body {
   }
 }
 
+/* Sidebar backdrop overlay */
+.sidebar-backdrop {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 99;
+}
+
+.sidebar-backdrop.show {
+  display: block;
+}
+
+/* Copy button in code blocks */
+.copy-btn {
+  background: rgba(99, 102, 241, 0.15);
+  color: var(--text-secondary);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-family: 'JetBrains Mono', monospace;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.copy-btn:hover {
+  background: rgba(99, 102, 241, 0.3);
+  color: var(--text-primary);
+}
+
+.copy-btn.copied {
+  background: rgba(16, 185, 129, 0.2);
+  color: var(--accent-green);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
 /* =========================================
    Animations
    ========================================= */
@@ -1141,5 +1182,17 @@ body {
 @media (max-width: 900px) {
   .nav-toggle {
     display: flex;
+  }
+}
+
+/* Reduced motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  #particles {
+    display: none;
   }
 }
