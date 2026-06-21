@@ -26,6 +26,23 @@ function init() {
   initParticles();
 }
 
+// ─── Mobile Menu Toggle ────────────────────
+const navToggle = document.getElementById('navToggle');
+const sidebar = document.getElementById('sidebar');
+const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+
+function toggleSidebar() {
+  sidebar.classList.toggle('open');
+  sidebarBackdrop.classList.toggle('show');
+}
+
+if (navToggle) {
+  navToggle.addEventListener('click', toggleSidebar);
+}
+if (sidebarBackdrop) {
+  sidebarBackdrop.addEventListener('click', toggleSidebar);
+}
+
 // ─── Navigation ────────────────────────────
 function buildNav() {
   lessonNav.innerHTML = "";
@@ -99,8 +116,38 @@ function goToLesson(idx) {
     nextBtn.onclick = () => startQuiz(idx);
   }
 
+  // Add copy buttons to code blocks
+  setTimeout(() => {
+    document.querySelectorAll('.code-block').forEach(block => {
+      const header = block.querySelector('.code-header');
+      const pre = block.querySelector('pre');
+      if (header && pre && !header.querySelector('.copy-btn')) {
+        const btn = document.createElement('button');
+        btn.className = 'copy-btn';
+        btn.textContent = 'Copy';
+        btn.addEventListener('click', () => {
+          navigator.clipboard.writeText(pre.textContent).then(() => {
+            btn.textContent = 'Copied!';
+            btn.classList.add('copied');
+            setTimeout(() => {
+              btn.textContent = 'Copy';
+              btn.classList.remove('copied');
+            }, 2000);
+          });
+        });
+        header.appendChild(btn);
+      }
+    });
+  }, 50);
+
   setActiveNav(idx);
   showScreen(lessonScreen);
+
+  // Close mobile sidebar
+  if (window.innerWidth <= 900) {
+    sidebar.classList.remove('open');
+    sidebarBackdrop.classList.remove('show');
+  }
 }
 
 function prevLesson() {
@@ -127,11 +174,11 @@ function startQuiz(lessonIdx) {
     div.className = "quiz-question";
     div.innerHTML = `
       <h4><span class="q-num">Q${qIdx + 1}.</span> ${q.question}</h4>
-      <div class="quiz-options" id="q${qIdx}-options">
+      <div class="quiz-options" id="q${qIdx}-options" role="radiogroup">
         ${q.options
           .map(
             (opt, oIdx) => `
-          <div class="quiz-option" onclick="selectOption(${qIdx}, ${oIdx})" id="q${qIdx}-o${oIdx}">
+          <div class="quiz-option" onclick="selectOption(${qIdx}, ${oIdx})" id="q${qIdx}-o${oIdx}" tabindex="0" role="radio" aria-checked="false" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectOption(${qIdx}, ${oIdx})}">
             <input type="radio" name="q${qIdx}" />
             <label>${escapeHtml(opt)}</label>
           </div>
@@ -159,10 +206,28 @@ function selectOption(qIdx, oIdx) {
   // Select clicked
   document.getElementById(`q${qIdx}-o${oIdx}`).classList.add("selected");
   quizAnswers[qIdx] = oIdx;
+
+  // Set actual radio checked for a11y
+  const radio = document.querySelector(`#q${qIdx}-o${oIdx} input[type="radio"]`);
+  if (radio) radio.checked = true;
 }
 
 function submitQuiz() {
   const lesson = LESSONS[currentLesson];
+
+  // Validate all questions answered
+  const totalQs = lesson.quiz.length;
+  const answeredQs = Object.keys(quizAnswers).length;
+  if (answeredQs < totalQs) {
+    const results = document.getElementById("quizResults");
+    results.classList.remove("hidden");
+    results.innerHTML = `
+      <h3>⚠️ Hold Up!</h3>
+      <p>Please answer all ${totalQs} questions before submitting.</p>
+    `;
+    return;
+  }
+
   let correct = 0;
 
   lesson.quiz.forEach((q, qIdx) => {
