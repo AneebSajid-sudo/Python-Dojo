@@ -68,6 +68,21 @@ async function init() {
         pyodideStatus.className = "text-error font-bold";
         logToConsole(">> Error loading Python environment: " + err.message, "text-error");
     }
+
+    // Mobile menu toggle
+    const battleToggle = document.getElementById('battleMenuToggle');
+    const battleSidebar = document.getElementById('battleSidebar');
+    const battleBackdrop = document.getElementById('battleBackdrop');
+    if (battleToggle && battleSidebar && battleBackdrop) {
+        battleToggle.addEventListener('click', () => {
+            battleSidebar.classList.toggle('-translate-x-full');
+            battleBackdrop.classList.toggle('hidden');
+        });
+        battleBackdrop.addEventListener('click', () => {
+            battleSidebar.classList.add('-translate-x-full');
+            battleBackdrop.classList.add('hidden');
+        });
+    }
 }
 
 // --- Console Helper ---
@@ -91,67 +106,67 @@ runBtn.addEventListener("click", async () => {
     
     logToConsole(">> Running tests...", "text-secondary mt-2");
     
-    // The code we will actually run: user code + hidden tests
     const testCode = `
 import sys
 import io
 
-# Capture user stdout
 original_stdout = sys.stdout
 sys.stdout = io.StringIO()
 
 try:
-${userCode.split('\\n').map(line => '    ' + line).join('\\n')}
+${userCode.split('\n').map(line => '    ' + line).join('\n')}
 except Exception as e:
     print(f"ERROR: {e}")
 
-output = sys.stdout.getvalue()
+user_output = sys.stdout.getvalue()
 sys.stdout = original_stdout
 
-# Perform hidden tests on the function if it exists
-def run_tests():
+def _run_tests():
     try:
-        if 'reverse_string' not in locals():
-            return {"success": False, "msg": "Function reverse_string not found!"}
-            
-        res1 = locals()['reverse_string']("python")
-        if res1 != "nohtyp":
-            return {"success": False, "msg": f"Test 1 Failed: reverse_string('python') returned '{res1}', expected 'nohtyp'"}
-            
-        res2 = locals()['reverse_string']("hello")
-        if res2 != "olleh":
-            return {"success": False, "msg": f"Test 2 Failed: reverse_string('hello') returned '{res2}', expected 'olleh'"}
-            
-        return {"success": True, "output": output}
+        result = reverse_string("python")
+        if result != "nohtyp":
+            return {"success": False, "msg": f"Test 1 Failed: reverse_string('python') returned '{result}', expected 'nohtyp'"}
+        result2 = reverse_string("hello")
+        if result2 != "olleh":
+            return {"success": False, "msg": f"Test 2 Failed: reverse_string('hello') returned '{result2}', expected 'olleh'"}
+        return {"success": True, "output": user_output}
+    except NameError:
+        return {"success": False, "msg": "Function reverse_string not found!"}
     except Exception as e:
-         return {"success": False, "msg": f"Test Error: {e}"}
+        return {"success": False, "msg": f"Test Error: {e}"}
 
-run_tests()
+_run_tests()
 `;
 
     try {
-        const result = await pyodideInstance.runPythonAsync(testCode);
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('TIMEOUT')), 5000)
+        );
+        const result = await Promise.race([
+            pyodideInstance.runPythonAsync(testCode),
+            timeoutPromise
+        ]);
         const resObj = result.toJs();
         
         if (resObj.get("success")) {
-            // Success!
             const printOutput = resObj.get("output");
             if (printOutput) {
                  logToConsole("Output: " + printOutput.trim(), "text-on-surface-variant");
             }
-            
             logToConsole(">> Test Case 1: 'python' -> 'nohtyp' [PASSED]", "text-secondary font-bold");
             logToConsole(">> Test Case 2: 'hello' -> 'olleh' [PASSED]", "text-secondary font-bold");
-            
             triggerVictory();
         } else {
-            // Failed
             logToConsole(">> " + resObj.get("msg"), "text-error font-bold");
             bossFlash("error");
         }
         
     } catch (err) {
-        logToConsole(">> Syntax Error in your code:\n" + err.message, "text-error");
+        if (err.message === 'TIMEOUT') {
+            logToConsole(">> Execution timed out (5s). Check for infinite loops.", "text-error font-bold");
+        } else {
+            logToConsole(">> Syntax Error in your code:\n" + err.message, "text-error");
+        }
         bossFlash("error");
     }
 });
