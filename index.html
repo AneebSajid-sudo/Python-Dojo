@@ -13,6 +13,7 @@
   <canvas id="particles"></canvas>
 
   <!-- Sidebar Navigation -->
+  <button class="nav-toggle" id="navToggle" aria-label="Open menu">☰</button>
   <nav id="sidebar">
     <div class="sidebar-header">
       <span class="logo">🐍</span>
@@ -35,6 +36,7 @@
       <div class="xp-badge" id="xpBadge">⚡ 0 XP</div>
     </div>
   </nav>
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
   <!-- Main Content -->
   <main id="mainContent">
@@ -47,7 +49,7 @@
         <div class="feature-cards">
           <div class="feature-card">
             <span class="feature-icon">📚</span>
-            <h3>10 Lessons</h3>
+            <h3>16 Lessons</h3>
             <p>Bite-sized lessons that build on each other</p>
           </div>
           <div class="feature-card">
@@ -117,7 +119,7 @@
       <div class="completion-container">
         <div class="completion-icon">🏆</div>
         <h1 class="welcome-title">You Did It, <span class="gradient-text">Champion!</span></h1>
-        <p class="welcome-subtitle">You've completed all 10 lessons of the Python Dojo. You now know the fundamentals of Python programming!</p>
+        <p class="welcome-subtitle">You've completed all lessons of the Python Dojo. You now know the fundamentals of Python programming!</p>
         <div class="completion-stats" id="completionStats"></div>
         <div class="completion-next">
           <h3>What's Next?</h3>
